@@ -1,0 +1,217 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Producción Actual</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #202020;
+            --text-color: white;
+            --accent-color: #ffffff;
+            --secondary-accent-color: #009e92;
+            --bg-card-color: #303030;
+            
+        }
+
+        [data-theme="light"] {
+            --bg-color: white;
+            --text-color: rgb(94, 94, 94);
+            --accent-color: #00b7ff;
+            --secondary-accent-color: #00d1b269;
+            --bg-card-color: #f3f3f3;
+        }
+        .background {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: url('{{ url_for("static", filename="images/blurr.jpg") }}') no-repeat center center fixed;
+        background-size: cover;
+        filter: blur(5px); 
+        z-index: -1;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            background-size: cover;
+        
+        }
+        nav {
+            color: var(--text-color);
+            background-color: var(--bg-card-color);
+            padding: 10px;
+            text-align: center;
+        }
+        nav a {
+            color: var(--text-color);
+            margin: 0 15px;
+            text-decoration: none;
+        }
+        .container {
+            color: var(--text-color);
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .kpi {
+            color: var(--text-color);
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+        .kpi div {
+            color: var(--text-color);
+            background: var(--bg-card-color);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            width: 27%;
+            box-shadow: 5px 5px 15px #ff9900cc;
+        }
+        .kpi div h2 {
+            color: var(--text-color);
+            margin: 0;
+            font-size: 2em;
+            color: var(--accent-color);
+        }
+        canvas {
+            max-width: 100%;
+            height: 500px;
+         color:var(--text-color);
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">Dashboard</a>
+        <a href="/jit">Justo a Tiempo</a>
+        <a href="/speed">Velocidad</a>
+    </nav>
+    <div class="theme-toggle">
+   
+       
+           
+        </button>
+    </div>
+    <div class="background"></div>
+
+    <div class="container">
+        <h1>Producción del Día Actual</h1>
+        
+        <!-- Indicadores Clave -->
+        <div class="kpi">
+            <div>
+                <h2 id="total-production">0</h2>
+                <p>Producción Total</p>
+            </div>
+            <div>
+                <h2 id="total-scrap">0</h2>
+                <p>Scrap Total</p>
+            </div>
+            <div>
+                <h2 id="efficiency">0%</h2>
+                <p>Eficiencia</p>
+            </div>
+        </div>
+
+        <canvas id="hourlyChart"></canvas>
+    </div>
+    <script>
+        let hourlyChart;
+
+        function formatNumber(num) {
+            return num.toLocaleString();
+        }
+
+        function updateDashboard() {
+            $.getJSON('/api/data', function(data) {
+                $('#total-production').text(formatNumber(data.metrics.total_production || 0));
+                $('#total-scrap').text(formatNumber(data.metrics.total_scrap || 0));
+                $('#efficiency').text((data.metrics.efficiency || 0).toFixed(2) + '%');
+
+                const labels = data.hourly_data.map(item => `${item.hour}:00`);
+                const production = data.hourly_data.map(item => item.productiondata_quantity);
+                const scrap = data.hourly_data.map(item => item.productiondata_scrap);
+
+                hourlyChart.data.labels = labels;
+                hourlyChart.data.datasets[0].data = production;
+                hourlyChart.data.datasets[1].data = scrap;
+                hourlyChart.update();
+            });
+        }
+
+        function createChart() {
+    const ctx = document.getElementById('hourlyChart').getContext('2d');
+    hourlyChart = new Chart(ctx, {
+        type: 'line', // Cambiar el tipo de gráfico a línea
+        data: {
+            labels: [], // Las etiquetas se llenarán dinámicamente
+            datasets: [
+                {
+                    label: 'Producción por Hora',
+                    data: [],
+                    borderColor: '#ffae00', // Color de la línea
+                    backgroundColor: 'rgba(255, 174, 0, 0.2)', // Color de relleno (transparente)
+                    fill: true, // Rellenar debajo de la línea
+                    tension: 0.4 // Suavizar la línea
+                },
+                {
+                    label: 'Scrap por Hora',
+                    data: [],
+                    borderColor: '#ff0000', // Color de la línea
+                    backgroundColor: 'rgba(255, 0, 0, 0.2)', // Color de relleno (transparente)
+                    fill: true, // Rellenar debajo de la línea
+                    tension: 0.4 // Suavizar la línea
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: 'white' // Color de las leyendas
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: { 
+                        display: true, 
+                        text: 'Hora', 
+                        font: { size: 18 }, 
+                        color: 'white' // Color del título en el eje X
+                    },
+                    ticks: {
+                        color: 'white' // Color de las etiquetas en el eje X
+                    }
+                },
+                y: {
+                    title: { 
+                        display: true, 
+                        text: 'Cantidad', 
+                        font: { size: 18 }, 
+                        color: 'white' // Color del título en el eje Y
+                    },
+                    ticks: {
+                        color: 'white' // Color de las etiquetas en el eje Y
+                    }
+                }
+            }
+        }
+    });
+}
+ 
+            createChart();
+            updateDashboard();
+            setInterval(updateDashboard, 1000);
+    </script>
+</body>
+</html>

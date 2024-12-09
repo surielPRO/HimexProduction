@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Justo a Tiempo</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0e0e0e;
+            --text-color: white;
+            --accent-color: #ffffff;
+            --secondary-accent-color: #009e92;
+            --bg-card-color: #2b2b2bc5;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+        }
+        nav {
+            background-color: var(--bg-card-color);
+            padding: 10px;
+            text-align: center;
+        }
+        nav a {
+            color: var(--text-color);
+            margin: 0 15px;
+            text-decoration: none;
+        }
+        .container {
+            max-width: 1500px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .metrics {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            flex: 1;
+            background-color: var(--bg-card-color);
+            color: var(--text-color);
+            padding: 20px;
+            margin: 0 10px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .metric-card h2 {
+            margin: 10px 0;
+            font-size: 24px;
+        }
+        .metric-card p {
+            margin: 0;
+            font-size: 18px;
+        }
+        .background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('{{ url_for("static", filename="images/jt.jpg") }}') no-repeat center center fixed;
+            background-size: cover;
+            filter: blur(3px);
+            z-index: -1;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">Dashboard</a>
+        <a href="/jit">Justo a Tiempo</a>
+        <a href="/speed">Velocidad</a>
+    </nav>
+    <div class="background"></div>
+    <div class="container">
+        <h1>Producción Justo a Tiempo</h1>
+
+        <div class="metrics">
+            <div class="metric-card">
+                <h2>Total Real</h2>
+                <p id="totalActual">0</p>
+            </div>
+            <div class="metric-card">
+                <h2>Total Planificado</h2>
+                <p id="totalPlanned">0</p>
+            </div>
+            <div class="metric-card">
+                <h2>Cumplimiento (%)</h2>
+                <p id="totalCompliance">0%</p>
+            </div>
+        </div>
+
+        <canvas id="jitChart"></canvas>
+    </div>
+
+    <script>
+        let jitChart;
+
+        function createGradient(ctx, color1, color2) {
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, color1);
+            gradient.addColorStop(1, color2);
+            return gradient;
+        }
+
+        function fetchJitData() {
+            $.getJSON('/api/jit', function(data) {
+                // Actualizar métricas globales
+                $('#totalActual').text(data.total_actual);
+                $('#totalPlanned').text(data.total_planned);
+                $('#totalCompliance').text(data.total_compliance + '%');
+
+                // Etiquetas y datos
+                const labels = data.jit_data.map(item => `${item.hour}:00`);
+                const planned = data.jit_data.map(item => item.planned);
+                const actual = data.jit_data.map(item => item.actual);
+
+                jitChart.data.labels = labels;
+                jitChart.data.datasets[0].data = planned;
+                jitChart.data.datasets[1].data = actual;
+                jitChart.update();
+            });
+        }
+
+        function createChart() {
+            const ctx = document.getElementById('jitChart').getContext('2d');
+            const plannedGradient = createGradient(ctx, '#1d8cf8', '#3358f4');
+            const actualGradient = createGradient(ctx, '#45df80', '#18ce0f');
+
+            jitChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Producción Planificada',
+                            data: [],
+                            borderColor: plannedGradient,
+                            backgroundColor: '#00b7ff2a',
+                            fill: true,
+                            tension: 0.2,
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Producción Real',
+                            data: [],
+                            borderColor: actualGradient,
+                            backgroundColor: '#00ff3783',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: {
+                                color: 'white',
+                                font: { size: 16 }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#0e0e0e',
+                            titleColor: 'white',
+                            bodyColor: 'white',
+                            borderColor: '#aaa',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Hora', font: { size: 18 }, color: 'white' },
+                            ticks: { color: 'white' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Cantidad', font: { size: 18 }, color: 'white' },
+                            ticks: { color: 'white' }
+                        }
+                    }
+                }
+            });
+        }
+
+        createChart();
+        fetchJitData();
+        setInterval(fetchJitData, 1000); // Actualizar cada 10 segundos
+    </script>
+</body>
+</html>
